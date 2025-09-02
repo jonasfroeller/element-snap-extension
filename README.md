@@ -1,0 +1,49 @@
+# Element Snap
+
+A lightweight, reliable Chrome extension to capture pixel-perfect screenshots of any HTML element.
+
+![Element Snap Preview](./demo.png)
+
+## Why Element Snap?
+
+Unlike other extensions that re-render HTML to an image (often breaking styles), Element Snap takes a screenshot of the visible page. This guarantees that what you see is *exactly* what you get.
+
+This approach is:
+* **Reliable:** Preserves 100% of the element's styling, layout, and fonts.
+* **Lightweight:** Built with zero libraries—just vanilla JavaScript and the Chrome API for maximum speed.
+
+> The only trade-off is that the element must be fully visible in the viewport to be captured.
+
+## Features
+
+* **Pixel-Perfect Capture:** Get a flawless image of any hovered element.
+* **Live Padding Controls:** Add uniform or per-side padding with a real-time preview.
+* **Flexible Output:** Save as PNG, JPG, WEBP, or SVG. Adjust quality for lossy formats.
+* **Element Hiding:** Temporarily hide surrounding elements with a keypress (`H`) for a clean shot.
+* **Keyboard Shortcuts:** Capture (`Ctrl/Cmd+Click`), lock focus (`L`), and more for a fast workflow.
+
+## How to Use
+
+1.  **Activate:** Click the extension icon in your toolbar to turn it on for the current tab.
+2.  **Hover:** Move your mouse to highlight the desired element.
+3.  **Adjust:** Use the floating panel to change padding, format, and other settings.
+4.  **Capture:** `Ctrl/Cmd + Click` the element or press the "Capture" button.
+
+## Installation
+
+**1. From Chrome Web Store (Recommended)**
+
+*Coming soon!*
+
+**2. From Source**
+
+1.  Clone this repository: `git clone https://github.com/jonasfroeller/element-snap.git`
+2.  Open Chrome and navigate to `chrome://extensions`.
+3.  Enable "Developer mode" in the top-right corner.
+4.  Click "Load unpacked" and select the cloned repository folder.
+
+## License
+
+This project is licensed under the GPLv3 License. See the `LICENSE` file for details.
+
+Copyright © 2025 Jonas Fröller
