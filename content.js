@@ -616,9 +616,11 @@ function onKeyDown(e) {
     if (LOCKED) {
       ensureLockedTracking();
     }
+    renderPanel();
   }
   if (e.key === "Escape" && LOCKED) {
     LOCKED = false;
+    renderPanel();
   }
   if (e.key === "h" || e.key === "H") {
     if (currentTarget) {
@@ -628,6 +630,7 @@ function onKeyDown(e) {
         currentTarget = null;
         currentRect = null;
         hideUIForScroll();
+        renderPanel();
       }
     }
   }
@@ -785,7 +788,7 @@ function renderPanel() {
     </div>`;
 
   // Wire interactions
-  panel.querySelector("#es-toggle").onclick = () => toggleActive(false);
+  panel.querySelector("#es-toggle").onclick = () => setActiveSoft(!ACTIVE);
   panel.querySelector("#es-lock").onclick = () => {
     LOCKED = !LOCKED;
     if (LOCKED) ensureLockedTracking();
@@ -1108,6 +1111,23 @@ function toggleActive(next) {
   }
   if (ACTIVE) disable();
   else enable();
+}
+
+function setActiveSoft(nextActive) {
+  if (nextActive) {
+    ACTIVE = true;
+    ensureOverlay();
+    if (overlay) overlay.style.display = "block";
+    if (currentRect) positionUI(currentRect);
+  } else {
+    ACTIVE = false;
+    LOCKED = false;
+    if (overlay) overlay.style.display = "none";
+    if (box) box.style.display = "none";
+    if (padMask) padMask.style.display = "none";
+    if (panel) panel.style.display = "block";
+  }
+  renderPanel();
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
