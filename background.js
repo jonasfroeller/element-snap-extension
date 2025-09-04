@@ -50,18 +50,17 @@ async function ensureInjected(tabId) {
   }
 }
 
-async function toggleForActiveTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab || tab.id == null) return;
-  const state = tabStates.get(tab.id) || { active: false };
+async function toggleForTab(tabId) {
+  if (tabId == null) return;
+  const state = tabStates.get(tabId) || { active: false };
   const next = { active: !state.active };
-  tabStates.set(tab.id, next);
-  setActiveBadge(tab.id, next.active);
+  tabStates.set(tabId, next);
+  setActiveBadge(tabId, next.active);
 
-  const ok = await ensureInjected(tab.id);
+  const ok = await ensureInjected(tabId);
   if (ok) {
     try {
-      await chrome.tabs.sendMessage(tab.id, {
+      await chrome.tabs.sendMessage(tabId, {
         type: "TOGGLE",
         active: next.active,
       });
@@ -69,8 +68,8 @@ async function toggleForActiveTab() {
   }
 }
 
-chrome.action.onClicked.addListener(() => {
-  toggleForActiveTab();
+chrome.action.onClicked.addListener((tab) => {
+  toggleForTab(tab?.id);
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -99,12 +98,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "CAPTURE") {
     (async () => {
       try {
-        const [tab] = await chrome.tabs.query({
-          active: true,
-          currentWindow: true,
-        });
-        if (!tab) return sendResponse({ ok: false, error: "NO_TAB" });
-        const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+        const windowId = sender?.tab?.windowId;
+        if (windowId == null)
+          return sendResponse({ ok: false, error: "NO_TAB" });
+        const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
           format: "png",
         });
         sendResponse({ ok: true, dataUrl });
