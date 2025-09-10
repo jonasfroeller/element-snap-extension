@@ -15,7 +15,7 @@ if exist "%STAGING_DIR%" rmdir /s /q "%STAGING_DIR%"
 mkdir "%STAGING_DIR%" >nul 2>&1
 
 rem stage files excluding .git, dist directory, demo.png/jpg, maps, readme, gitignore and this script
-robocopy . "%STAGING_DIR%" /E /XD .git dist /XF demo.png demo.jpg element-snap.zip "%SCRIPT_NAME%" .gitignore README.md *.map >nul
+robocopy . "%STAGING_DIR%" /E /XD .git dist /XF demo.png demo.jpg element-snap.zip "%SCRIPT_NAME%" .gitignore CHANGELOG.md README.md *.map >nul
 
 rem verify staging contains files
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$c=(Get-ChildItem -Path '%STAGING_DIR%' -Recurse -File).Count; if ($c -gt 0) { Write-Output ('STAGING_FILE_COUNT='+$c); exit 0 } else { Write-Output 'STAGING_FILE_COUNT=0'; exit 8 }"
