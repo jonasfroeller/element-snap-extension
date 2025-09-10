@@ -33,7 +33,7 @@ This approach is:
 
 **1. From Chrome Web Store (Recommended)**
 
-*Coming soon!*
+[chromewebstore.google.com](https://chromewebstore.google.com/detail/element-snap/nldbbahmckpcjcbikdaopeaiidhdomkf)
 
 **2. From Source**
 
