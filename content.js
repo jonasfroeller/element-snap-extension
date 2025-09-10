@@ -469,6 +469,13 @@ const onMouseMove = throttleRaf((e) => {
     ensureLockedTracking();
     return;
   }
+  // Avoid re-rendering the panel while interacting with it (breaks slider drag)
+  if (panel) {
+    const pr = panel.getBoundingClientRect();
+    if (e.clientX >= pr.left && e.clientX <= pr.right && e.clientY >= pr.top && e.clientY <= pr.bottom) {
+      return;
+    }
+  }
   const el = pickTargetFromPoint(e.clientX, e.clientY);
   if (!el) return;
   currentTarget = el;
