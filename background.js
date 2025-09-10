@@ -95,6 +95,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "SET_ACTIVE") {
+    (async () => {
+      try {
+        const tabId = sender?.tab?.id;
+        if (tabId == null) return sendResponse({ ok: false, error: "NO_TAB" });
+        const active = !!message.active;
+        tabStates.set(tabId, { active });
+        setActiveBadge(tabId, active);
+        const ok = await ensureInjected(tabId);
+        if (ok) {
+          try {
+            await chrome.tabs.sendMessage(tabId, { type: "TOGGLE", active });
+          } catch (_) {}
+        }
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+    })();
+    return true;
+  }
+
   if (message?.type === "CAPTURE") {
     (async () => {
       try {

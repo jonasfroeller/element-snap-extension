@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.8] - 2025-09-10
+- Add Rounded Corners option with live preview and export clipping
+
+## [0.1.7] - 2025-09-10
+- Add Close button next to Capture to turn off the extension quickly
+
+## [0.1.6] - 2025-09-10
+- Add Dim toggle to panel to reduce opacity (~10%) for better visibility of underlying content when padding is present
+
+## [0.1.5] - 2025-09-10
+- Make settings panel position sticky to prevent flicker on lock/unlock
+- Clamp and keep panel visible on scroll/resize; add internal scroll to avoid overflow
+- Reduce re-renders of panel UI; update dynamic parts without rebuilding
+
 ## [0.1.4] - 2025-09-10
 - Add Capture Margin setting to include real page pixels around element
 

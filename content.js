@@ -27,6 +27,8 @@ const DEFAULTS = {
   format: "png",
   quality: 90,
   filenamePrefix: "element-screenshot",
+  panelOpacityLow: false,
+  roundedRadius: 0,
 };
 
 let ACTIVE = false;
@@ -37,12 +39,15 @@ let currentRect = null; // viewport coords
 let settings = { ...DEFAULTS };
 let overlay, box, panel;
 let padMask, padTop, padRight, padBottom, padLeft;
+let padCanvas = null, padCtx = null;
+let canvasDpr = 1;
 let rafId = null;
 let hideTimer = null;
 let lockRaf = null;
 let hiddenElements = []; // stack of { el, prevStyle, hadStyleAttr, label }
 let host = null;
 let shadowRoot = null;
+let panelPos = null; // sticky panel position ({ left, top })
 
 function css(strings) {
   return strings.join("");
@@ -76,9 +81,10 @@ const STYLE = css`
     border: 2px solid #2563eb;
     outline: 2px solid rgba(37, 99, 235, 0.25);
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: 0px;
     box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
     transition: left 80ms, top 80ms, width 80ms, height 80ms;
+    z-index: 2147483644;
   }
   #es-padmask {
     position: fixed;
@@ -98,6 +104,8 @@ const STYLE = css`
     font: 12px/1.4 -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Inter,
       Helvetica, Arial, sans-serif;
     color: #111827;
+    contain: content;
+    transition: opacity 120ms ease;
   }
   #es-panel .card {
     background: #fff;
@@ -105,6 +113,9 @@ const STYLE = css`
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
     padding: 10px;
+    max-height: min(72vh, calc(100vh - 16px));
+    overflow: auto;
+    overscroll-behavior: contain;
   }
   #es-panel label {
     display: block;
@@ -227,18 +238,20 @@ function ensureOverlay() {
   // Padding preview mask with 4 sides
   padMask = document.createElement("div");
   padMask.id = "es-padmask";
-  padTop = document.createElement("div");
-  padTop.className = "es-pad";
-  padRight = document.createElement("div");
-  padRight.className = "es-pad";
-  padBottom = document.createElement("div");
-  padBottom.className = "es-pad";
-  padLeft = document.createElement("div");
-  padLeft.className = "es-pad";
+  padTop = document.createElement("div"); padTop.className = "es-pad";
+  padRight = document.createElement("div"); padRight.className = "es-pad";
+  padBottom = document.createElement("div"); padBottom.className = "es-pad";
+  padLeft = document.createElement("div"); padLeft.className = "es-pad";
+  const cvs = document.createElement("canvas");
+  cvs.className = "es-pad";
+  cvs.style.pointerEvents = "none";
+  padCanvas = cvs;
+  padCtx = cvs.getContext("2d");
   padMask.appendChild(padTop);
   padMask.appendChild(padRight);
   padMask.appendChild(padBottom);
   padMask.appendChild(padLeft);
+  padMask.appendChild(cvs);
   overlay.appendChild(padMask);
 
   ensureHost();
@@ -285,6 +298,8 @@ function migrateSettings(prefs) {
   if (out.paddingMode !== "uniform" && out.paddingMode !== "sides")
     out.paddingMode = "uniform";
   out.captureMargin = Number(prefs.captureMargin ?? 0) || 0;
+  out.panelOpacityLow = !!prefs.panelOpacityLow;
+  out.roundedRadius = Math.max(0, Number(prefs.roundedRadius ?? 0) || 0);
   return out;
 }
 
@@ -375,6 +390,46 @@ function computePanelPosition(rect) {
     top: clamp(top, 8, vh - approxH - 8),
   };
 }
+function getPanelApproxHeight() {
+  if (panel) {
+    const r = panel.getBoundingClientRect();
+    if (r && r.height) return Math.min(r.height, window.innerHeight - 16);
+  }
+  return 260;
+}
+
+function clampPanelPos(pos) {
+  if (!pos) pos = { left: 8, top: 8 };
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const approxH = getPanelApproxHeight();
+  const left = Math.max(8, Math.min(vw - PANEL_W - 8, pos.left));
+  const top = Math.max(8, Math.min(vh - approxH - 8, pos.top));
+  return { left, top };
+}
+
+function setPanelPosition(pos) {
+  if (!panel) return;
+  panel.style.left = pos.left + "px";
+  panel.style.top = pos.top + "px";
+  panel.style.display = "block";
+}
+
+function ensurePanelPositionFromRect(rect) {
+  if (!panel) return;
+  const desired = computePanelPosition(rect);
+  if (!panelPos || !LOCKED) {
+    panelPos = desired;
+  }
+  panelPos = clampPanelPos(panelPos);
+  setPanelPosition(panelPos);
+}
+
+function clampPanelWithinViewport() {
+  if (!panel) return;
+  panelPos = clampPanelPos(panelPos || { left: panel.offsetLeft || 8, top: panel.offsetTop || 8 });
+  setPanelPosition(panelPos);
+}
 
 function getPadsCss() {
   if (settings.paddingMode === "sides") {
@@ -418,6 +473,8 @@ function setPadPreview(rect) {
     el.style.top = top + "px";
     el.style.width = Math.max(0, width) + "px";
     el.style.height = Math.max(0, height) + "px";
+    // Reset per-corner radius; set outer corners explicitly below
+    el.style.borderRadius = "0px";
     if (isPattern) {
       el.style.background = bg;
       el.style.backgroundColor = "";
@@ -436,6 +493,11 @@ function setPadPreview(rect) {
     base.width + pads.l + pads.r,
     pads.t
   );
+  const r = Math.max(0, Number(settings.roundedRadius) || 0);
+  padTop.style.borderTopLeftRadius = r + "px";
+  padTop.style.borderTopRightRadius = r + "px";
+  padTop.style.borderBottomLeftRadius = "0px";
+  padTop.style.borderBottomRightRadius = "0px";
   // Bottom
   apply(
     padBottom,
@@ -444,10 +506,94 @@ function setPadPreview(rect) {
     base.width + pads.l + pads.r,
     pads.b
   );
+  padBottom.style.borderBottomLeftRadius = r + "px";
+  padBottom.style.borderBottomRightRadius = r + "px";
+  padBottom.style.borderTopLeftRadius = "0px";
+  padBottom.style.borderTopRightRadius = "0px";
   // Left
   apply(padLeft, base.x - pads.l, base.y, pads.l, base.height);
+  padLeft.style.borderTopLeftRadius = r + "px";
+  padLeft.style.borderBottomLeftRadius = r + "px";
+  padLeft.style.borderTopRightRadius = "0px";
+  padLeft.style.borderBottomRightRadius = "0px";
   // Right
   apply(padRight, base.x + base.width, base.y, pads.r, base.height);
+  padRight.style.borderTopRightRadius = r + "px";
+  padRight.style.borderBottomRightRadius = r + "px";
+  padRight.style.borderTopLeftRadius = "0px";
+  padRight.style.borderBottomLeftRadius = "0px";
+
+  // Use canvas overlay for precise outer rounded rectangle ring (covers capture margin + padding)
+  if (padCanvas && padCtx) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    if (padCanvas.width !== Math.floor(vw * dpr)) padCanvas.width = Math.floor(vw * dpr);
+    if (padCanvas.height !== Math.floor(vh * dpr)) padCanvas.height = Math.floor(vh * dpr);
+    padCanvas.style.left = "0px";
+    padCanvas.style.top = "0px";
+    padCanvas.style.width = vw + "px";
+    padCanvas.style.height = vh + "px";
+    padCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    padCtx.clearRect(0, 0, vw, vh);
+
+    const outer = { x: base.x - pads.l, y: base.y - pads.t, w: base.width + pads.l + pads.r, h: base.height + pads.t + pads.b };
+    const marginRect = { x: base.x, y: base.y, w: base.width, h: base.height };
+    const contentRect = { x: rect.x, y: rect.y, w: rect.width, h: rect.height };
+    const rr = Math.max(0, Number(settings.roundedRadius) || 0);
+    const rOuter = Math.min(rr, Math.floor(Math.min(outer.w, outer.h) / 2));
+    const rMargin = Math.min(rr, Math.floor(Math.min(marginRect.w, marginRect.h) / 2));
+    const rContent = Math.min(rr, Math.floor(Math.min(contentRect.w, contentRect.h) / 2));
+
+    function roundRectPath(ctx, x, y, w, h, r) {
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    // 1) Padding band: outer(rounded) - margin(rounded)
+    if (pads.l + pads.r + pads.t + pads.b > 0) {
+      padCtx.beginPath();
+      roundRectPath(padCtx, outer.x, outer.y, outer.w, outer.h, rOuter);
+      roundRectPath(padCtx, marginRect.x, marginRect.y, marginRect.w, marginRect.h, rMargin);
+      if (useColor) {
+        padCtx.fillStyle = settings.paddingColor;
+      } else {
+        const tile = document.createElement("canvas");
+        tile.width = 12; tile.height = 12;
+        const t = tile.getContext("2d");
+        t.fillStyle = "#e5e7eb";
+        t.fillRect(0, 0, 6, 6);
+        t.fillRect(6, 6, 6, 6);
+        padCtx.fillStyle = padCtx.createPattern(tile, "repeat");
+      }
+      padCtx.fill("evenodd");
+    }
+
+    // 2) Capture margin band: margin(rounded) - content(rounded)
+    if (m > 0) {
+      padCtx.beginPath();
+      roundRectPath(padCtx, marginRect.x, marginRect.y, marginRect.w, marginRect.h, rMargin);
+      roundRectPath(padCtx, contentRect.x, contentRect.y, contentRect.w, contentRect.h, rContent);
+      const tile2 = document.createElement("canvas");
+      tile2.width = 12; tile2.height = 12;
+      const t2 = tile2.getContext("2d");
+      t2.fillStyle = "#e5e7eb";
+      t2.fillRect(0, 0, 6, 6);
+      t2.fillRect(6, 6, 6, 6);
+      padCtx.fillStyle = padCtx.createPattern(tile2, "repeat");
+      padCtx.fill("evenodd");
+    }
+
+    // Hide the 4 rectangular pads; canvas represents the preview now
+    padTop.style.display = "none";
+    padRight.style.display = "none";
+    padBottom.style.display = "none";
+    padLeft.style.display = "none";
+  }
 }
 
 function positionUI(rect) {
@@ -464,14 +610,11 @@ function positionUI(rect) {
     box.style.top = rect.y + "px";
     box.style.width = rect.width + "px";
     box.style.height = rect.height + "px";
+    // Element outline is always square; rounding applies only to padding/margin ring
+    box.style.borderRadius = "0px";
   }
   setPadPreview(rect);
-  if (panel) {
-    const pos = computePanelPosition(rect);
-    panel.style.left = pos.left + "px";
-    panel.style.top = pos.top + "px";
-    panel.style.display = "block";
-  }
+  if (panel) ensurePanelPositionFromRect(rect);
 }
 
 const onMouseMove = throttleRaf((e) => {
@@ -498,7 +641,7 @@ const onMouseMove = throttleRaf((e) => {
     height: Math.round(r.height),
   };
   positionUI(currentRect);
-  renderPanel();
+  if (!panel) renderPanel();
 });
 
 function hideUIForScroll() {
@@ -506,7 +649,7 @@ function hideUIForScroll() {
   hideTimer = setTimeout(() => {
     if (overlay) overlay.style.display = "none";
     if (box) box.style.display = "none";
-    if (panel) panel.style.display = "none";
+    if (panel) clampPanelWithinViewport();
     if (padMask) padMask.style.display = "none";
   }, 0);
 }
@@ -518,6 +661,7 @@ const onScroll = throttleRaf(() => {
     } else {
       hideUIForScroll();
     }
+    clampPanelWithinViewport();
   }
 });
 const onResize = throttleRaf(() => {
@@ -527,6 +671,7 @@ const onResize = throttleRaf(() => {
     } else {
       hideUIForScroll();
     }
+    clampPanelWithinViewport();
   }
 });
 
@@ -731,16 +876,13 @@ function renderPanel() {
     shadowRoot.appendChild(panel);
   }
 
-  // Expand preview outline to reflect capture margin for clarity
-  const pos = computePanelPosition({
+  // Ensure sticky position without jumping during lock/unlock
+  ensurePanelPositionFromRect({
     x: currentRect.x - (Number(settings.captureMargin) || 0),
     y: currentRect.y - (Number(settings.captureMargin) || 0),
     width: currentRect.width + 2 * (Number(settings.captureMargin) || 0),
     height: currentRect.height + 2 * (Number(settings.captureMargin) || 0),
   });
-  panel.style.left = pos.left + "px";
-  panel.style.top = pos.top + "px";
-  panel.style.display = "block";
 
   const isAlpha = supportsAlpha(settings.format);
   const uniform = settings.paddingMode === "uniform";
@@ -798,6 +940,9 @@ function renderPanel() {
           <button class="btn ${LOCKED ? "primary" : ""}" id="es-lock">${
     LOCKED ? "Locked" : "Lock"
   }</button>
+          <button class="btn ghost" id="es-dim">${
+            settings.panelOpacityLow ? "Opaque" : "Dim"
+          }</button>
           <button class="btn ghost" id="es-toggle">${
             ACTIVE ? "Off" : "On"
           }</button>
@@ -825,6 +970,9 @@ function renderPanel() {
       <input id="es-cm" type="range" min="0" max="200" step="2" value="${settings.captureMargin}" />
 
       ${transControls}
+
+      <label style="margin-top:6px;">Rounded Corners: <span id="es-r-label">${settings.roundedRadius}px</span></label>
+      <input id="es-r" type="range" min="0" max="48" step="1" value="${settings.roundedRadius}" />
 
       <label style="margin-top:6px;">Format</label>
       <select id="es-format">
@@ -854,8 +1002,8 @@ function renderPanel() {
       <input id="es-name" type="text" value="${settings.filenamePrefix}" />
 
       <label style="margin-top:10px;">Clean up</label>
-      <div class="muted">Hidden elements: ${hiddenCount} — Press <span class="kbd">H</span> to hide current, <span class="kbd">R</span> to restore last, <span class="kbd">Shift</span> + <span class="kbd">R</span> to restore all.</div>
-      <div style="margin-top:6px; display:grid; gap:6px; max-height:160px; overflow:auto;">${
+      <div class="muted">Hidden elements: <span id="es-hidden-count">${hiddenCount}</span> — Press <span class="kbd">H</span> to hide current, <span class="kbd">R</span> to restore last, <span class="kbd">Shift</span> + <span class="kbd">R</span> to restore all.</div>
+      <div id="es-hidden-list" style="margin-top:6px; display:grid; gap:6px; max-height:160px; overflow:auto;">${
         hiddenList || '<div class="muted">No hidden elements yet.</div>'
       }</div>
 
@@ -865,6 +1013,7 @@ function renderPanel() {
         <div class="shortcut"><span class="kbd">Esc</span><span class="muted">Unlock</span></div>
       </div>
       <div class="row" style="margin-top:8px;">
+        <button class="btn ghost" id="es-close">Close</button>
         <button class="btn primary" id="es-capture">Capture</button>
       </div>
     </div>`;
@@ -874,8 +1023,16 @@ function renderPanel() {
   panel.querySelector("#es-lock").onclick = () => {
     LOCKED = !LOCKED;
     if (LOCKED) ensureLockedTracking();
-    renderPanel();
+    setLockButtonState();
   };
+  const dimBtn = panel.querySelector("#es-dim");
+  if (dimBtn)
+    dimBtn.onclick = () => {
+      settings.panelOpacityLow = !settings.panelOpacityLow;
+      persistSettings();
+      applyPanelOpacity();
+      dimBtn.textContent = settings.panelOpacityLow ? "Opaque" : "Dim";
+    };
 
   // Mode
   const modeU = panel.querySelector("#es-mode-u");
@@ -986,6 +1143,15 @@ function renderPanel() {
       panel.querySelector("#es-q-label").textContent = settings.quality + "%";
       persistSettings();
     };
+  const rEl = panel.querySelector("#es-r");
+  if (rEl)
+    rEl.oninput = () => {
+      settings.roundedRadius = Math.max(0, Number(rEl.value) || 0);
+      const lbl = panel.querySelector("#es-r-label");
+      if (lbl) lbl.textContent = settings.roundedRadius + "px";
+      persistSettings();
+      if (currentRect) positionUI(currentRect);
+    };
   const cmEl = panel.querySelector("#es-cm");
   if (cmEl)
     cmEl.oninput = () => {
@@ -1001,9 +1167,46 @@ function renderPanel() {
     persistSettings();
   };
   panel.querySelector("#es-capture").onclick = () => captureFlow();
+  const closeBtn = panel.querySelector("#es-close");
+  if (closeBtn)
+    closeBtn.onclick = () => {
+      chrome.runtime.sendMessage({ type: "SET_ACTIVE", active: false });
+    };
 
-  // Clean up list (Unhide buttons)
-  const unhideBtns = panel.querySelectorAll("[data-es-unhide]");
+  updateHiddenList();
+  applyPanelOpacity();
+}
+
+function applyPanelOpacity() {
+  if (!panel) return;
+  const low = !!settings.panelOpacityLow;
+  panel.style.opacity = low ? "0.1" : "1";
+}
+
+function setLockButtonState() {
+  if (!panel) return;
+  const btn = panel.querySelector("#es-lock");
+  if (!btn) return;
+  btn.textContent = LOCKED ? "Locked" : "Lock";
+  if (LOCKED) btn.classList.add("primary");
+  else btn.classList.remove("primary");
+}
+
+function updateHiddenList() {
+  if (!panel) return;
+  const container = panel.querySelector("#es-hidden-list");
+  const count = panel.querySelector("#es-hidden-count");
+  if (count) count.textContent = String(hiddenElements.length);
+  if (!container) return;
+  const html = hiddenElements
+    .map((h, i) => {
+      const raw = h.label || nodeLabel(h.el);
+      const safe = escapeHtml(raw);
+      return `<div class=\"row\" style=\"justify-content:space-between; align-items:center;\"><div class=\"muted\" style=\"white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 170px;\" title=\"${safe}\">${safe}</div><button class=\"btn\" data-es-unhide=\"${i}\">Unhide</button></div>`;
+    })
+    .join("");
+  container.innerHTML = html || '<div class="muted">No hidden elements yet.</div>';
+  const unhideBtns = container.querySelectorAll("[data-es-unhide]");
   unhideBtns.forEach((btn) => {
     btn.addEventListener(
       "click",
@@ -1012,7 +1215,7 @@ function renderPanel() {
         ev.stopPropagation();
         const idx = Number(btn.getAttribute("data-es-unhide"));
         restoreHiddenAt(idx);
-        renderPanel();
+        updateHiddenList();
       },
       { passive: false }
     );
@@ -1106,24 +1309,78 @@ async function captureFlow() {
     canvas.height = sHeight + pad.t + pad.b;
     const ctx2 = canvas.getContext("2d");
 
-    if (settings.paddingType === "colored" || !supportsAlpha(settings.format)) {
-      ctx2.fillStyle = settings.paddingColor || "#ffffff";
-      ctx2.fillRect(0, 0, canvas.width, canvas.height);
-    } else {
-      ctx2.clearRect(0, 0, canvas.width, canvas.height);
+    const isAlpha = supportsAlpha(settings.format);
+    const rr = Math.max(0, Number(settings.roundedRadius) || 0);
+    const applyClip = rr > 0;
+    if (applyClip) {
+      ctx2.save();
+      const r = Math.min(rr, Math.floor(Math.min(canvas.width, canvas.height) / 2));
+      const x = 0, y = 0, w = canvas.width, h = canvas.height;
+      ctx2.beginPath();
+      ctx2.moveTo(x + r, y);
+      ctx2.arcTo(x + w, y, x + w, y + h, r);
+      ctx2.arcTo(x + w, y + h, x, y + h, r);
+      ctx2.arcTo(x, y + h, x, y, r);
+      ctx2.arcTo(x, y, x + w, y, r);
+      ctx2.closePath();
+      ctx2.clip();
     }
 
-    ctx2.drawImage(
-      image,
-      sx,
-      sy,
-      sWidth,
-      sHeight,
-      pad.l,
-      pad.t,
-      sWidth,
-      sHeight
-    );
+    // Always start with a cleared canvas inside the outer clip
+    ctx2.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw the captured content first
+    ctx2.drawImage(image, sx, sy, sWidth, sHeight, pad.l, pad.t, sWidth, sHeight);
+
+    // Compute rects for ring fills
+    const outer = { x: 0, y: 0, w: canvas.width, h: canvas.height };
+    const marginRect = { x: pad.l, y: pad.t, w: sWidth, h: sHeight };
+    const trimLeft = Math.max(0, sx - rawSx);
+    const trimTop = Math.max(0, sy - rawSy);
+    const trimRight = Math.max(0, rawSW - trimLeft - sWidth);
+    const trimBottom = Math.max(0, rawSH - trimTop - sHeight);
+    const mLeft = Math.max(0, marginPx - trimLeft);
+    const mTop = Math.max(0, marginPx - trimTop);
+    const mRight = Math.max(0, marginPx - trimRight);
+    const mBottom = Math.max(0, marginPx - trimBottom);
+    const contentRect = {
+      x: marginRect.x + mLeft,
+      y: marginRect.y + mTop,
+      w: Math.max(0, marginRect.w - mLeft - mRight),
+      h: Math.max(0, marginRect.h - mTop - mBottom),
+    };
+
+    const rOuter = Math.min(rr, Math.floor(Math.min(outer.w, outer.h) / 2));
+    const rMargin = Math.min(rr, Math.floor(Math.min(marginRect.w, marginRect.h) / 2));
+    const rContent = Math.min(rr, Math.floor(Math.min(contentRect.w, contentRect.h) / 2));
+
+    function pathRoundRect(ctx, x, y, w, h, r) {
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    const fillColor = settings.paddingColor || "#ffffff";
+
+    // Padding ring: outer - margin
+    if (pad.l + pad.r + pad.t + pad.b > 0) {
+      if (settings.paddingType === "colored" || !isAlpha) {
+        ctx2.beginPath();
+        pathRoundRect(ctx2, outer.x, outer.y, outer.w, outer.h, rOuter);
+        pathRoundRect(ctx2, marginRect.x, marginRect.y, marginRect.w, marginRect.h, rMargin);
+        ctx2.fillStyle = fillColor;
+        ctx2.fill("evenodd");
+      } else {
+        // transparent: nothing to draw for padding band
+      }
+    }
+
+    if (applyClip) {
+      ctx2.restore();
+    }
 
     let dataUrl, ext;
     if (settings.format === "svg") {
