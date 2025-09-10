@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Element Snap",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The lightweight, reliable way to capture pixel-perfect screenshots of any visible HTML element.",
   "icons": {
     "16": "logo.png",

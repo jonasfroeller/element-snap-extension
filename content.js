@@ -40,6 +40,8 @@ let rafId = null;
 let hideTimer = null;
 let lockRaf = null;
 let hiddenElements = []; // stack of { el, prevStyle, hadStyleAttr, label }
+let host = null;
+let shadowRoot = null;
 
 function css(strings) {
   return strings.join("");
@@ -52,6 +54,16 @@ const PANEL_W = 280;
 const PANEL_MARGIN = 8;
 
 const STYLE = css`
+  :host {
+    all: initial;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  button, input, select, textarea {
+    font: inherit;
+    color: inherit;
+  }
   #es-overlay {
     position: fixed;
     inset: 0;
@@ -170,12 +182,34 @@ const STYLE = css`
   }
 `;
 
+function ensureHost() {
+  if (host && shadowRoot) return shadowRoot;
+  host = document.getElementById("es-host");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "es-host";
+    // Prevent host from inheriting text properties that could leak through UA behavior
+    host.style.all = "initial";
+    host.style.position = "fixed";
+    host.style.inset = "0";
+    host.style.pointerEvents = "none";
+    document.documentElement.appendChild(host);
+  }
+  if (!host.shadowRoot) {
+    shadowRoot = host.attachShadow({ mode: "open" });
+  } else {
+    shadowRoot = host.shadowRoot;
+  }
+  return shadowRoot;
+}
+
 function injectStyle() {
-  if (document.getElementById("es-style")) return;
+  ensureHost();
+  if (shadowRoot.getElementById("es-style")) return;
   const style = document.createElement("style");
   style.id = "es-style";
   style.textContent = STYLE;
-  document.documentElement.appendChild(style);
+  shadowRoot.appendChild(style);
 }
 
 function ensureOverlay() {
@@ -206,7 +240,8 @@ function ensureOverlay() {
   padMask.appendChild(padLeft);
   overlay.appendChild(padMask);
 
-  document.documentElement.appendChild(overlay);
+  ensureHost();
+  shadowRoot.appendChild(overlay);
   return overlay;
 }
 
@@ -221,6 +256,13 @@ function removeOverlay() {
     box = null;
     padMask = null;
     padTop = padRight = padBottom = padLeft = null;
+  }
+  if (host) {
+    try {
+      host.remove();
+    } catch (_) {}
+    host = null;
+    shadowRoot = null;
   }
 }
 
@@ -268,12 +310,18 @@ function throttleRaf(fn) {
 function pickTargetFromPoint(x, y) {
   const stack =
     (document.elementsFromPoint ? document.elementsFromPoint(x, y) : []) || [];
-  if (panel && stack.includes(panel)) return currentTarget;
+  // Avoid reacting while hovering the panel inside shadow DOM
+  if (panel) {
+    const pr = panel.getBoundingClientRect();
+    if (x >= pr.left && x <= pr.right && y >= pr.top && y <= pr.bottom)
+      return currentTarget;
+  }
   for (const el of stack) {
     if (!el) continue;
     if (el === document.documentElement || el === document.body) continue;
     if (el.closest && el.closest('[data-es-hidden="1"]')) continue;
     if (overlay && (el === overlay || el === box || el === padMask)) continue;
+    if (host && el === host) continue;
     if (panel && (el === panel || panel.contains(el))) continue;
     return el;
   }
@@ -282,6 +330,7 @@ function pickTargetFromPoint(x, y) {
     el &&
     el !== document.documentElement &&
     el !== document.body &&
+    el !== host &&
     (!panel || !panel.contains(el)) &&
     !(el.closest && el.closest('[data-es-hidden="1"]'))
   )
@@ -554,7 +603,13 @@ function restoreAllHidden() {
 
 const onMouseDown = (e) => {
   if (!ACTIVE) return;
-  if (panel && panel.contains(e.target)) return;
+  // Ignore interactions on the panel region (events may retarget to host)
+  if (panel) {
+    const pr = panel.getBoundingClientRect();
+    if (e.clientX >= pr.left && e.clientX <= pr.right && e.clientY >= pr.top && e.clientY <= pr.bottom) {
+      return;
+    }
+  }
   const isCtrl = e.ctrlKey || e.metaKey;
   if (!isCtrl) return; // only on CTRL/CMD + click
   const el =
@@ -654,8 +709,8 @@ function renderPanel() {
     panel.style.maxWidth = PANEL_W + "px";
     panel.style.willChange = "transform";
     panel.addEventListener("mousedown", (ev) => ev.stopPropagation(), true);
-    const container = document.body || document.documentElement;
-    container.appendChild(panel);
+    ensureHost();
+    shadowRoot.appendChild(panel);
   }
 
   const pos = computePanelPosition(currentRect);
@@ -939,24 +994,19 @@ function waitFrames(n = 2) {
 }
 
 function detachUI() {
-  const root = document.body || document.documentElement;
+  const parent = host && host.parentNode ? host.parentNode : null;
   const removed = [];
-  if (overlay && overlay.parentNode) {
-    overlay.parentNode.removeChild(overlay);
-    removed.push("overlay");
+  if (host && parent) {
+    parent.removeChild(host);
+    removed.push("host");
   }
-  if (panel && panel.parentNode) {
-    panel.parentNode.removeChild(panel);
-    removed.push("panel");
-  }
-  return { removed, root };
+  return { removed, root: parent };
 }
 
 function reattachUI(ctx) {
   if (!ctx) return;
-  const root = ctx.root || document.body || document.documentElement;
-  if (ctx.removed?.includes("overlay") && overlay) root.appendChild(overlay);
-  if (ctx.removed?.includes("panel") && panel) root.appendChild(panel);
+  const parent = ctx.root || document.body || document.documentElement;
+  if (ctx.removed?.includes("host") && host) parent.appendChild(host);
 }
 
 function getPadsPx(dpr) {
