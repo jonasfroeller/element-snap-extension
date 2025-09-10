@@ -39,7 +39,8 @@ let currentRect = null; // viewport coords
 let settings = { ...DEFAULTS };
 let overlay, box, panel;
 let padMask, padTop, padRight, padBottom, padLeft;
-let padCanvas = null, padCtx = null;
+let padCanvas = null,
+  padCtx = null;
 let canvasDpr = 1;
 let rafId = null;
 let hideTimer = null;
@@ -66,7 +67,10 @@ const STYLE = css`
   * {
     box-sizing: border-box;
   }
-  button, input, select, textarea {
+  button,
+  input,
+  select,
+  textarea {
     font: inherit;
     color: inherit;
   }
@@ -238,10 +242,14 @@ function ensureOverlay() {
   // Padding preview mask with 4 sides
   padMask = document.createElement("div");
   padMask.id = "es-padmask";
-  padTop = document.createElement("div"); padTop.className = "es-pad";
-  padRight = document.createElement("div"); padRight.className = "es-pad";
-  padBottom = document.createElement("div"); padBottom.className = "es-pad";
-  padLeft = document.createElement("div"); padLeft.className = "es-pad";
+  padTop = document.createElement("div");
+  padTop.className = "es-pad";
+  padRight = document.createElement("div");
+  padRight.className = "es-pad";
+  padBottom = document.createElement("div");
+  padBottom.className = "es-pad";
+  padLeft = document.createElement("div");
+  padLeft.className = "es-pad";
   const cvs = document.createElement("canvas");
   cvs.className = "es-pad";
   cvs.style.pointerEvents = "none";
@@ -427,7 +435,9 @@ function ensurePanelPositionFromRect(rect) {
 
 function clampPanelWithinViewport() {
   if (!panel) return;
-  panelPos = clampPanelPos(panelPos || { left: panel.offsetLeft || 8, top: panel.offsetTop || 8 });
+  panelPos = clampPanelPos(
+    panelPos || { left: panel.offsetLeft || 8, top: panel.offsetTop || 8 }
+  );
   setPanelPosition(panelPos);
 }
 
@@ -528,8 +538,10 @@ function setPadPreview(rect) {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const dpr = Math.max(1, window.devicePixelRatio || 1);
-    if (padCanvas.width !== Math.floor(vw * dpr)) padCanvas.width = Math.floor(vw * dpr);
-    if (padCanvas.height !== Math.floor(vh * dpr)) padCanvas.height = Math.floor(vh * dpr);
+    if (padCanvas.width !== Math.floor(vw * dpr))
+      padCanvas.width = Math.floor(vw * dpr);
+    if (padCanvas.height !== Math.floor(vh * dpr))
+      padCanvas.height = Math.floor(vh * dpr);
     padCanvas.style.left = "0px";
     padCanvas.style.top = "0px";
     padCanvas.style.width = vw + "px";
@@ -537,13 +549,24 @@ function setPadPreview(rect) {
     padCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     padCtx.clearRect(0, 0, vw, vh);
 
-    const outer = { x: base.x - pads.l, y: base.y - pads.t, w: base.width + pads.l + pads.r, h: base.height + pads.t + pads.b };
+    const outer = {
+      x: base.x - pads.l,
+      y: base.y - pads.t,
+      w: base.width + pads.l + pads.r,
+      h: base.height + pads.t + pads.b,
+    };
     const marginRect = { x: base.x, y: base.y, w: base.width, h: base.height };
     const contentRect = { x: rect.x, y: rect.y, w: rect.width, h: rect.height };
     const rr = Math.max(0, Number(settings.roundedRadius) || 0);
     const rOuter = Math.min(rr, Math.floor(Math.min(outer.w, outer.h) / 2));
-    const rMargin = Math.min(rr, Math.floor(Math.min(marginRect.w, marginRect.h) / 2));
-    const rContent = Math.min(rr, Math.floor(Math.min(contentRect.w, contentRect.h) / 2));
+    const rMargin = Math.min(
+      rr,
+      Math.floor(Math.min(marginRect.w, marginRect.h) / 2)
+    );
+    const rContent = Math.min(
+      rr,
+      Math.floor(Math.min(contentRect.w, contentRect.h) / 2)
+    );
 
     function roundRectPath(ctx, x, y, w, h, r) {
       ctx.moveTo(x + r, y);
@@ -558,12 +581,20 @@ function setPadPreview(rect) {
     if (pads.l + pads.r + pads.t + pads.b > 0) {
       padCtx.beginPath();
       roundRectPath(padCtx, outer.x, outer.y, outer.w, outer.h, rOuter);
-      roundRectPath(padCtx, marginRect.x, marginRect.y, marginRect.w, marginRect.h, rMargin);
+      roundRectPath(
+        padCtx,
+        marginRect.x,
+        marginRect.y,
+        marginRect.w,
+        marginRect.h,
+        rMargin
+      );
       if (useColor) {
         padCtx.fillStyle = settings.paddingColor;
       } else {
         const tile = document.createElement("canvas");
-        tile.width = 12; tile.height = 12;
+        tile.width = 12;
+        tile.height = 12;
         const t = tile.getContext("2d");
         t.fillStyle = "#e5e7eb";
         t.fillRect(0, 0, 6, 6);
@@ -576,10 +607,25 @@ function setPadPreview(rect) {
     // 2) Capture margin band: margin(rounded) - content(rounded)
     if (m > 0) {
       padCtx.beginPath();
-      roundRectPath(padCtx, marginRect.x, marginRect.y, marginRect.w, marginRect.h, rMargin);
-      roundRectPath(padCtx, contentRect.x, contentRect.y, contentRect.w, contentRect.h, rContent);
+      roundRectPath(
+        padCtx,
+        marginRect.x,
+        marginRect.y,
+        marginRect.w,
+        marginRect.h,
+        rMargin
+      );
+      roundRectPath(
+        padCtx,
+        contentRect.x,
+        contentRect.y,
+        contentRect.w,
+        contentRect.h,
+        rContent
+      );
       const tile2 = document.createElement("canvas");
-      tile2.width = 12; tile2.height = 12;
+      tile2.width = 12;
+      tile2.height = 12;
       const t2 = tile2.getContext("2d");
       t2.fillStyle = "#e5e7eb";
       t2.fillRect(0, 0, 6, 6);
@@ -626,7 +672,12 @@ const onMouseMove = throttleRaf((e) => {
   // Avoid re-rendering the panel while interacting with it (breaks slider drag)
   if (panel) {
     const pr = panel.getBoundingClientRect();
-    if (e.clientX >= pr.left && e.clientX <= pr.right && e.clientY >= pr.top && e.clientY <= pr.bottom) {
+    if (
+      e.clientX >= pr.left &&
+      e.clientX <= pr.right &&
+      e.clientY >= pr.top &&
+      e.clientY <= pr.bottom
+    ) {
       return;
     }
   }
@@ -769,7 +820,12 @@ const onMouseDown = (e) => {
   // Ignore interactions on the panel region (events may retarget to host)
   if (panel) {
     const pr = panel.getBoundingClientRect();
-    if (e.clientX >= pr.left && e.clientX <= pr.right && e.clientY >= pr.top && e.clientY <= pr.bottom) {
+    if (
+      e.clientX >= pr.left &&
+      e.clientX <= pr.right &&
+      e.clientY >= pr.top &&
+      e.clientY <= pr.bottom
+    ) {
       return;
     }
   }
@@ -966,13 +1022,21 @@ function renderPanel() {
           : `<label>Padding (px)</label>${perSideControls}`
       }
 
-      <label style="margin-top:6px;">Capture Margin: <span id="es-cm-label">${settings.captureMargin}px</span></label>
-      <input id="es-cm" type="range" min="0" max="200" step="2" value="${settings.captureMargin}" />
+      <label style="margin-top:6px;">Capture Margin: <span id="es-cm-label">${
+        settings.captureMargin
+      }px</span></label>
+      <input id="es-cm" type="range" min="0" max="200" step="2" value="${
+        settings.captureMargin
+      }" />
 
       ${transControls}
 
-      <label style="margin-top:6px;">Rounded Corners: <span id="es-r-label">${settings.roundedRadius}px</span></label>
-      <input id="es-r" type="range" min="0" max="48" step="1" value="${settings.roundedRadius}" />
+      <label style="margin-top:6px;">Rounded Corners: <span id="es-r-label">${
+        settings.roundedRadius
+      }px</span></label>
+      <input id="es-r" type="range" min="0" max="48" step="1" value="${
+        settings.roundedRadius
+      }" />
 
       <label style="margin-top:6px;">Format</label>
       <select id="es-format">
@@ -1205,7 +1269,8 @@ function updateHiddenList() {
       return `<div class=\"row\" style=\"justify-content:space-between; align-items:center;\"><div class=\"muted\" style=\"white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 170px;\" title=\"${safe}\">${safe}</div><button class=\"btn\" data-es-unhide=\"${i}\">Unhide</button></div>`;
     })
     .join("");
-  container.innerHTML = html || '<div class="muted">No hidden elements yet.</div>';
+  container.innerHTML =
+    html || '<div class="muted">No hidden elements yet.</div>';
   const unhideBtns = container.querySelectorAll("[data-es-unhide]");
   unhideBtns.forEach((btn) => {
     btn.addEventListener(
@@ -1293,7 +1358,10 @@ async function captureFlow() {
     const canvas = document.createElement("canvas");
     const targetW = Math.max(1, Math.floor(currentRect.width * dpr));
     const targetH = Math.max(1, Math.floor(currentRect.height * dpr));
-    const marginPx = Math.max(0, Math.floor((Number(settings.captureMargin) || 0) * dpr));
+    const marginPx = Math.max(
+      0,
+      Math.floor((Number(settings.captureMargin) || 0) * dpr)
+    );
     const pad = getPadsPx(dpr);
     // Compute crop rect with margin and clamp to captured image bounds
     const rawSx = Math.floor(currentRect.x * dpr) - marginPx;
@@ -1302,8 +1370,14 @@ async function captureFlow() {
     const rawSH = targetH + marginPx * 2;
     const sx = Math.max(0, rawSx);
     const sy = Math.max(0, rawSy);
-    const sWidth = Math.min(rawSW - (sx - rawSx), Math.max(0, image.width - sx));
-    const sHeight = Math.min(rawSH - (sy - rawSy), Math.max(0, image.height - sy));
+    const sWidth = Math.min(
+      rawSW - (sx - rawSx),
+      Math.max(0, image.width - sx)
+    );
+    const sHeight = Math.min(
+      rawSH - (sy - rawSy),
+      Math.max(0, image.height - sy)
+    );
 
     canvas.width = sWidth + pad.l + pad.r;
     canvas.height = sHeight + pad.t + pad.b;
@@ -1314,8 +1388,14 @@ async function captureFlow() {
     const applyClip = rr > 0;
     if (applyClip) {
       ctx2.save();
-      const r = Math.min(rr, Math.floor(Math.min(canvas.width, canvas.height) / 2));
-      const x = 0, y = 0, w = canvas.width, h = canvas.height;
+      const r = Math.min(
+        rr,
+        Math.floor(Math.min(canvas.width, canvas.height) / 2)
+      );
+      const x = 0,
+        y = 0,
+        w = canvas.width,
+        h = canvas.height;
       ctx2.beginPath();
       ctx2.moveTo(x + r, y);
       ctx2.arcTo(x + w, y, x + w, y + h, r);
@@ -1330,7 +1410,17 @@ async function captureFlow() {
     ctx2.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw the captured content first
-    ctx2.drawImage(image, sx, sy, sWidth, sHeight, pad.l, pad.t, sWidth, sHeight);
+    ctx2.drawImage(
+      image,
+      sx,
+      sy,
+      sWidth,
+      sHeight,
+      pad.l,
+      pad.t,
+      sWidth,
+      sHeight
+    );
 
     // Compute rects for ring fills
     const outer = { x: 0, y: 0, w: canvas.width, h: canvas.height };
@@ -1351,8 +1441,14 @@ async function captureFlow() {
     };
 
     const rOuter = Math.min(rr, Math.floor(Math.min(outer.w, outer.h) / 2));
-    const rMargin = Math.min(rr, Math.floor(Math.min(marginRect.w, marginRect.h) / 2));
-    const rContent = Math.min(rr, Math.floor(Math.min(contentRect.w, contentRect.h) / 2));
+    const rMargin = Math.min(
+      rr,
+      Math.floor(Math.min(marginRect.w, marginRect.h) / 2)
+    );
+    const rContent = Math.min(
+      rr,
+      Math.floor(Math.min(contentRect.w, contentRect.h) / 2)
+    );
 
     function pathRoundRect(ctx, x, y, w, h, r) {
       ctx.moveTo(x + r, y);
@@ -1370,7 +1466,14 @@ async function captureFlow() {
       if (settings.paddingType === "colored" || !isAlpha) {
         ctx2.beginPath();
         pathRoundRect(ctx2, outer.x, outer.y, outer.w, outer.h, rOuter);
-        pathRoundRect(ctx2, marginRect.x, marginRect.y, marginRect.w, marginRect.h, rMargin);
+        pathRoundRect(
+          ctx2,
+          marginRect.x,
+          marginRect.y,
+          marginRect.w,
+          marginRect.h,
+          rMargin
+        );
         ctx2.fillStyle = fillColor;
         ctx2.fill("evenodd");
       } else {
