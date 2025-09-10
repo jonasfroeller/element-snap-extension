@@ -23,6 +23,7 @@ const DEFAULTS = {
   paddingSides: { top: 10, right: 10, bottom: 10, left: 10 },
   paddingType: "transparent",
   paddingColor: "#EEF2FF",
+  captureMargin: 0,
   format: "png",
   quality: 90,
   filenamePrefix: "element-screenshot",
@@ -283,6 +284,7 @@ function migrateSettings(prefs) {
   }
   if (out.paddingMode !== "uniform" && out.paddingMode !== "sides")
     out.paddingMode = "uniform";
+  out.captureMargin = Number(prefs.captureMargin ?? 0) || 0;
   return out;
 }
 
@@ -391,7 +393,8 @@ function getPadsCss() {
 function setPadPreview(rect) {
   if (!padMask || !padTop) return;
   const pads = getPadsCss();
-  const show = pads.l + pads.r + pads.t + pads.b > 0;
+  const m = Math.max(0, Number(settings.captureMargin) || 0);
+  const show = pads.l + pads.r + pads.t + pads.b > 0 || m > 0;
   padMask.style.display = show ? "block" : "none";
   if (!show) return;
   const isAlpha = supportsAlpha(settings.format);
@@ -401,6 +404,14 @@ function setPadPreview(rect) {
     ? settings.paddingColor
     : "repeating-conic-gradient(#e5e7eb 0% 25%, transparent 0% 50%) 0 / 12px 12px";
   const isPattern = !useColor;
+
+  // Expand preview origin by capture margin so padding is pushed outwards
+  const base = {
+    x: rect.x - m,
+    y: rect.y - m,
+    width: rect.width + 2 * m,
+    height: rect.height + 2 * m,
+  };
 
   const apply = (el, left, top, width, height) => {
     el.style.left = left + "px";
@@ -420,23 +431,23 @@ function setPadPreview(rect) {
   // Top
   apply(
     padTop,
-    rect.x - pads.l,
-    rect.y - pads.t,
-    rect.width + pads.l + pads.r,
+    base.x - pads.l,
+    base.y - pads.t,
+    base.width + pads.l + pads.r,
     pads.t
   );
   // Bottom
   apply(
     padBottom,
-    rect.x - pads.l,
-    rect.y + rect.height,
-    rect.width + pads.l + pads.r,
+    base.x - pads.l,
+    base.y + base.height,
+    base.width + pads.l + pads.r,
     pads.b
   );
   // Left
-  apply(padLeft, rect.x - pads.l, rect.y, pads.l, rect.height);
+  apply(padLeft, base.x - pads.l, base.y, pads.l, base.height);
   // Right
-  apply(padRight, rect.x + rect.width, rect.y, pads.r, rect.height);
+  apply(padRight, base.x + base.width, base.y, pads.r, base.height);
 }
 
 function positionUI(rect) {
@@ -720,7 +731,13 @@ function renderPanel() {
     shadowRoot.appendChild(panel);
   }
 
-  const pos = computePanelPosition(currentRect);
+  // Expand preview outline to reflect capture margin for clarity
+  const pos = computePanelPosition({
+    x: currentRect.x - (Number(settings.captureMargin) || 0),
+    y: currentRect.y - (Number(settings.captureMargin) || 0),
+    width: currentRect.width + 2 * (Number(settings.captureMargin) || 0),
+    height: currentRect.height + 2 * (Number(settings.captureMargin) || 0),
+  });
   panel.style.left = pos.left + "px";
   panel.style.top = pos.top + "px";
   panel.style.display = "block";
@@ -803,6 +820,9 @@ function renderPanel() {
            <input id=\"es-pad\" type=\"range\" min=\"0\" max=\"50\" step=\"1\" value=\"${settings.padding}\" />`
           : `<label>Padding (px)</label>${perSideControls}`
       }
+
+      <label style="margin-top:6px;">Capture Margin: <span id="es-cm-label">${settings.captureMargin}px</span></label>
+      <input id="es-cm" type="range" min="0" max="200" step="2" value="${settings.captureMargin}" />
 
       ${transControls}
 
@@ -966,6 +986,15 @@ function renderPanel() {
       panel.querySelector("#es-q-label").textContent = settings.quality + "%";
       persistSettings();
     };
+  const cmEl = panel.querySelector("#es-cm");
+  if (cmEl)
+    cmEl.oninput = () => {
+      settings.captureMargin = Number(cmEl.value);
+      const lbl = panel.querySelector("#es-cm-label");
+      if (lbl) lbl.textContent = settings.captureMargin + "px";
+      persistSettings();
+      positionUI(currentRect);
+    };
   const nameEl = panel.querySelector("#es-name");
   nameEl.oninput = () => {
     settings.filenamePrefix = nameEl.value;
@@ -1061,9 +1090,20 @@ async function captureFlow() {
     const canvas = document.createElement("canvas");
     const targetW = Math.max(1, Math.floor(currentRect.width * dpr));
     const targetH = Math.max(1, Math.floor(currentRect.height * dpr));
+    const marginPx = Math.max(0, Math.floor((Number(settings.captureMargin) || 0) * dpr));
     const pad = getPadsPx(dpr);
-    canvas.width = targetW + pad.l + pad.r;
-    canvas.height = targetH + pad.t + pad.b;
+    // Compute crop rect with margin and clamp to captured image bounds
+    const rawSx = Math.floor(currentRect.x * dpr) - marginPx;
+    const rawSy = Math.floor(currentRect.y * dpr) - marginPx;
+    const rawSW = targetW + marginPx * 2;
+    const rawSH = targetH + marginPx * 2;
+    const sx = Math.max(0, rawSx);
+    const sy = Math.max(0, rawSy);
+    const sWidth = Math.min(rawSW - (sx - rawSx), Math.max(0, image.width - sx));
+    const sHeight = Math.min(rawSH - (sy - rawSy), Math.max(0, image.height - sy));
+
+    canvas.width = sWidth + pad.l + pad.r;
+    canvas.height = sHeight + pad.t + pad.b;
     const ctx2 = canvas.getContext("2d");
 
     if (settings.paddingType === "colored" || !supportsAlpha(settings.format)) {
@@ -1073,18 +1113,16 @@ async function captureFlow() {
       ctx2.clearRect(0, 0, canvas.width, canvas.height);
     }
 
-    const sx = Math.max(0, Math.floor(currentRect.x * dpr));
-    const sy = Math.max(0, Math.floor(currentRect.y * dpr));
     ctx2.drawImage(
       image,
       sx,
       sy,
-      targetW,
-      targetH,
+      sWidth,
+      sHeight,
       pad.l,
       pad.t,
-      targetW,
-      targetH
+      sWidth,
+      sHeight
     );
 
     let dataUrl, ext;

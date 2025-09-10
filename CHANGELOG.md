@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.4] - 2025-09-10
+- Add Capture Margin setting to include real page pixels around element
+
 ## [0.1.3] - 2025-09-10
 - Update extension logo
 
