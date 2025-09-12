@@ -10,7 +10,7 @@ Unlike other extensions that re-render HTML to an image (often breaking styles),
 
 This approach is:
 * **Reliable:** Preserves 100% of the element's styling, layout, and fonts.
-* **Lightweight:** Built with zero libraries—just vanilla JavaScript and the Chrome API for maximum speed.
+* **Lightweight:** Built with zero libraries-, just vanilla JavaScript and the Chrome API for maximum speed.
 
 > The only trade-off is that the element must be fully visible in the viewport to be captured.
 
@@ -41,6 +41,15 @@ This approach is:
 2.  Open Chrome and navigate to `chrome://extensions`.
 3.  Enable "Developer mode" in the top-right corner.
 4.  Click "Load unpacked" and select the cloned repository folder.
+
+## Privacy & Permissions
+
+- Uses `activeTab` and `scripting` to inject the UI only on demand when you click the extension action.
+- Uses `tabs.captureVisibleTab` to screenshot the visible area of the current window; no network transmission occurs.
+- Uses `storage.sync` to save UI preferences (padding, format, etc.).
+- Uses `downloads` to save images to your device without additional prompts.
+
+No analytics, tracking, or external requests. All processing happens locally in your browser.
 
 ## License
 

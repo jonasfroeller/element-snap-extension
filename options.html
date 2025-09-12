@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Element Snap - Options</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      body {
+        font: 14px/1.4 -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
+          Inter, Helvetica, Arial, sans-serif;
+        color: #111827;
+        margin: 24px;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+        padding: 16px;
+        max-width: 720px;
+      }
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .grid-4 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 12px;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        color: #4b5563;
+        margin-bottom: 4px;
+      }
+      input[type="text"],
+      select,
+      input[type="color"] {
+        height: 32px;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 0 10px;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        background: #fff;
+      }
+      input[type="range"] {
+        width: 100%;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 32px;
+        padding: 0 12px;
+        border-radius: 6px;
+        border: 1px solid #e5e7eb;
+        background: #f9fafb;
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: #4f46e5;
+        color: #fff;
+        border-color: #4f46e5;
+      }
+      .muted {
+        color: #6b7280;
+        font-size: 12px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 12px;
+      }
+      .section {
+        margin-top: 16px;
+      }
+      .val {
+        display: inline-block;
+        min-width: 36px;
+        text-align: right;
+        color: #6b7280;
+        font-size: 12px;
+      }
+      @media (max-width: 720px) {
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+        .grid-4 {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Element Snap - Options</h1>
+
+      <div class="section grid-2">
+        <div>
+          <label>Padding Mode</label>
+          <select id="opt-mode">
+            <option value="uniform">Uniform</option>
+            <option value="sides">Per side</option>
+          </select>
+        </div>
+        <div>
+          <label>Filename Prefix</label>
+          <input id="opt-name" type="text" placeholder="element-screenshot" />
+        </div>
+      </div>
+
+      <div class="section grid-2">
+        <div>
+          <label>Padding (Uniform)</label>
+          <div class="row">
+            <input id="opt-pad" type="range" min="0" max="50" step="1" />
+            <span class="val" id="lbl-pad">0px</span>
+          </div>
+        </div>
+        <div>
+          <label>Capture Margin</label>
+          <div class="row">
+            <input id="opt-cm" type="range" min="0" max="200" step="2" />
+            <span class="val" id="lbl-cm">0px</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="section-sides" class="section" style="display: none">
+        <label>Padding (Per Side)</label>
+        <div class="grid-4">
+          <div>
+            <label>Top</label>
+            <div class="row">
+              <input id="opt-pt" type="range" min="0" max="50" step="1" />
+              <span class="val" id="lbl-pt">0px</span>
+            </div>
+          </div>
+          <div>
+            <label>Right</label>
+            <div class="row">
+              <input id="opt-pr" type="range" min="0" max="50" step="1" />
+              <span class="val" id="lbl-pr">0px</span>
+            </div>
+          </div>
+          <div>
+            <label>Bottom</label>
+            <div class="row">
+              <input id="opt-pb" type="range" min="0" max="50" step="1" />
+              <span class="val" id="lbl-pb">0px</span>
+            </div>
+          </div>
+          <div>
+            <label>Left</label>
+            <div class="row">
+              <input id="opt-pl" type="range" min="0" max="50" step="1" />
+              <span class="val" id="lbl-pl">0px</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section grid-2">
+        <div>
+          <label>Padding Color</label>
+          <input id="opt-color" type="color" />
+        </div>
+        <div>
+          <label>Padding Type</label>
+          <select id="opt-ptype">
+            <option value="transparent">Transparent</option>
+            <option value="colored">Colored</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section grid-2">
+        <div>
+          <label>Rounded Corners</label>
+          <div class="row">
+            <input id="opt-r" type="range" min="0" max="48" step="1" />
+            <span class="val" id="lbl-r">0px</span>
+          </div>
+        </div>
+        <div>
+          <label>Format</label>
+          <select id="opt-format">
+            <option value="png">PNG</option>
+            <option value="webp">WEBP</option>
+            <option value="jpg">JPG</option>
+            <option value="svg">SVG</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="section-quality" class="section" style="display: none">
+        <label>Quality</label>
+        <div class="row">
+          <input id="opt-q" type="range" min="10" max="100" step="5" />
+          <span class="val" id="lbl-q">90%</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="row">
+          <button class="btn" id="btn-reset">Reset</button>
+          <button class="btn primary" id="btn-save">Save</button>
+          <span class="muted" id="status" aria-live="polite"></span>
+        </div>
+      </div>
+    </div>
+
+    <script src="options.js"></script>
+  </body>
+</html>

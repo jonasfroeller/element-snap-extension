@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.9] - 2025-09-12
+- Sanitize filename prefix to avoid OS-invalid characters
+- Escape dynamic HTML values in panel to prevent attribute injection
+- Use passive event listeners where safe for smoother scrolling
+- Add short_name, homepage_url, and i18n (default_locale, en locale)
+- Add Privacy & Permissions section to README
+- Add Options page with editable defaults
+
 ## [0.1.8] - 2025-09-10
 - Add Rounded Corners option with live preview and export clipping
 

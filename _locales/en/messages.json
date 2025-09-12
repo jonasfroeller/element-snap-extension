@@ -1,0 +1,14 @@
+{
+    "appName": {
+        "message": "Element Snap"
+    },
+    "appShortName": {
+        "message": "Element Snap"
+    },
+    "appDesc": {
+        "message": "The lightweight, reliable way to capture pixel-perfect screenshots of any visible HTML element."
+    },
+    "actionTitle": {
+        "message": "Element Snap"
+    }
+}

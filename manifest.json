@@ -1,8 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Element Snap",
-  "version": "0.1.8",
-  "description": "The lightweight, reliable way to capture pixel-perfect screenshots of any visible HTML element.",
+  "name": "__MSG_appName__",
+  "short_name": "__MSG_appShortName__",
+  "version": "0.1.9",
+  "description": "__MSG_appDesc__",
+  "homepage_url": "https://github.com/jonasfroeller/element-snap",
+  "default_locale": "en",
   "icons": {
     "16": "logo.png",
     "32": "logo.png",
@@ -10,7 +13,7 @@
     "128": "logo.png"
   },
   "action": {
-    "default_title": "Element Snap",
+    "default_title": "__MSG_actionTitle__",
     "default_icon": {
       "16": "logo.png",
       "24": "logo.png",
@@ -20,12 +23,13 @@
   "permissions": [
     "activeTab",
     "storage",
-    "downloads",
-    "scripting"
+    "scripting",
+    "downloads"
   ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
+  "options_page": "options.html",
   "minimum_chrome_version": "88"
 }

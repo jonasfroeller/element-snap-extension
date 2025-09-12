@@ -735,6 +735,18 @@ function escapeHtml(s) {
     .replace(/'/g, "&#39;");
 }
 
+function sanitizeFilename(name) {
+  const raw = String(name == null ? "" : name).trim();
+  // Replace control chars and reserved characters <>:"/\|?* with '-'
+  const replaced = raw
+    .replace(/[\u0000-\u001F\u007F<>:"/\\|?*]+/g, "-")
+    .replace(/\s+/g, " ");
+  // Collapse multiple dashes and trim dots at ends
+  const collapsed = replaced.replace(/-{2,}/g, "-").replace(/^\.+|\.+$/g, "");
+  const sliced = collapsed.slice(0, 60);
+  return sliced || "element-screenshot";
+}
+
 function siblingIndex(el) {
   let i = 1;
   let p = el;
@@ -982,11 +994,13 @@ function renderPanel() {
       }\" id=\"es-pad-c\">Colored</button>\n       </div>\n       ${
         settings.paddingType === "colored"
           ? '<label>Padding Color</label><input id="es-pad-color" type="color" value="' +
-            settings.paddingColor +
+            escapeHtml(settings.paddingColor) +
             '" />'
           : ""
       }`
-    : `<div class=\"row\" style=\"margin-top:6px;\"><span class=\"muted\">Format has no transparency; using Background Color for export.</span></div>\n       <label style=\"margin-top:6px;\">Background Color</label>\n       <input id=\"es-pad-color\" type=\"color\" value=\"${settings.paddingColor}\" />`;
+    : `<div class=\"row\" style=\"margin-top:6px;\"><span class=\"muted\">Format has no transparency; using Background Color for export.</span></div>\n       <label style=\"margin-top:6px;\">Background Color</label>\n       <input id=\"es-pad-color\" type=\"color\" value=\"${escapeHtml(
+        settings.paddingColor
+      )}\" />`;
 
   panel.innerHTML = `
     <div class="card">
@@ -1063,10 +1077,12 @@ function renderPanel() {
           : ""
       }
       <label style="margin-top:6px;">Filename Prefix</label>
-      <input id="es-name" type="text" value="${settings.filenamePrefix}" />
+      <input id="es-name" type="text" value="${escapeHtml(
+        settings.filenamePrefix
+      )}" />
 
       <label style="margin-top:10px;">Clean up</label>
-      <div class="muted">Hidden elements: <span id="es-hidden-count">${hiddenCount}</span> — Press <span class="kbd">H</span> to hide current, <span class="kbd">R</span> to restore last, <span class="kbd">Shift</span> + <span class="kbd">R</span> to restore all.</div>
+      <div class="muted">Hidden elements: <span id="es-hidden-count">${hiddenCount}</span> - Press <span class="kbd">H</span> to hide current, <span class="kbd">R</span> to restore last, <span class="kbd">Shift</span> + <span class="kbd">R</span> to restore all.</div>
       <div id="es-hidden-list" style="margin-top:6px; display:grid; gap:6px; max-height:160px; overflow:auto;">${
         hiddenList || '<div class="muted">No hidden elements yet.</div>'
       }</div>
@@ -1509,7 +1525,10 @@ async function captureFlow() {
     }
 
     const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    const filename = `${settings.filenamePrefix}-${ts}.${ext}`;
+    const prefixSafe = sanitizeFilename(
+      settings.filenamePrefix || "element-screenshot"
+    );
+    const filename = `${prefixSafe}-${ts}.${ext}`;
     await new Promise((resolve) =>
       chrome.runtime.sendMessage(
         { type: "DOWNLOAD", dataUrl, filename },
@@ -1539,22 +1558,28 @@ async function enable() {
   ACTIVE = true;
   await loadSettings();
   ensureOverlay();
-  window.addEventListener("mousemove", onMouseMove, true);
-  window.addEventListener("mousedown", onMouseDown, true);
-  window.addEventListener("keydown", onKeyDown, true);
-  window.addEventListener("scroll", onScroll, true);
-  document.addEventListener("scroll", onScroll, true);
+  window.addEventListener("mousemove", onMouseMove, {
+    capture: true,
+    passive: true,
+  });
+  window.addEventListener("mousedown", onMouseDown, { capture: true });
+  window.addEventListener("keydown", onKeyDown, { capture: true });
+  window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+  document.addEventListener("scroll", onScroll, {
+    capture: true,
+    passive: true,
+  });
   window.addEventListener("resize", onResize);
 }
 
 function disable() {
   ACTIVE = false;
   LOCKED = false;
-  window.removeEventListener("mousemove", onMouseMove, true);
-  window.removeEventListener("mousedown", onMouseDown, true);
-  window.removeEventListener("keydown", onKeyDown, true);
-  window.removeEventListener("scroll", onScroll, true);
-  document.removeEventListener("scroll", onScroll, true);
+  window.removeEventListener("mousemove", onMouseMove, { capture: true });
+  window.removeEventListener("mousedown", onMouseDown, { capture: true });
+  window.removeEventListener("keydown", onKeyDown, { capture: true });
+  window.removeEventListener("scroll", onScroll, { capture: true });
+  document.removeEventListener("scroll", onScroll, { capture: true });
   window.removeEventListener("resize", onResize);
   removeOverlay();
 }
