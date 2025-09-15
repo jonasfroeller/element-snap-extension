@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.10] - 2025-09-15
+- Reorganize assets and update build script
+
 ## [0.1.9] - 2025-09-12
 - Sanitize filename prefix to avoid OS-invalid characters
 - Escape dynamic HTML values in panel to prevent attribute injection

@@ -14,8 +14,27 @@ if exist "%DIST_DIR%\%ZIP_NAME%" del /f /q "%DIST_DIR%\%ZIP_NAME%"
 if exist "%STAGING_DIR%" rmdir /s /q "%STAGING_DIR%"
 mkdir "%STAGING_DIR%" >nul 2>&1
 
-rem stage files excluding .git, dist directory, demo.png/jpg, maps, readme, gitignore and this script
-robocopy . "%STAGING_DIR%" /E /XD .git dist /XF demo.png demo.jpg element-snap.zip "%SCRIPT_NAME%" .gitignore CHANGELOG.md README.md *.map >nul
+rem stage files excluding .git, dist, and entire assets dir; exclude non-runtime docs and this script
+robocopy . "%STAGING_DIR%" /E /XD ".git" "dist" "assets" /XF "%ZIP_NAME%" "%SCRIPT_NAME%" ".gitignore" "CHANGELOG.md" "README.md" /NFL /NDL /NJH /NJS >nul
+
+rem add required assets into staging
+set "STAGING_ASSETS=%STAGING_DIR%\assets"
+set "LOGO_SRC=assets\logo.png"
+mkdir "%STAGING_ASSETS%" >nul 2>&1
+if exist "%LOGO_SRC%" (
+  where magick >nul 2>&1
+  if "%ERRORLEVEL%"=="0" (
+    for %%S in (16 24 32 48 128) do (
+      echo Generating icon %%S x %%S ...
+      magick "%LOGO_SRC%" -resize %%Sx%%S -background none -gravity center -extent %%Sx%%S "%STAGING_ASSETS%\icon-%%S.png" >nul 2>&1
+    )
+  ) else (
+    echo ImageMagick not found. Using logo.png as source to create icon-*.png copies.
+    for %%S in (16 24 32 48 128) do (
+      copy /y "%LOGO_SRC%" "%STAGING_ASSETS%\icon-%%S.png" >nul 2>&1
+    )
+  )
+)
 
 rem verify staging contains files
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$c=(Get-ChildItem -Path '%STAGING_DIR%' -Recurse -File).Count; if ($c -gt 0) { Write-Output ('STAGING_FILE_COUNT='+$c); exit 0 } else { Write-Output 'STAGING_FILE_COUNT=0'; exit 8 }"

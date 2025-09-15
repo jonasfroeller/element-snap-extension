@@ -1,8 +1,17 @@
 # Element Snap
 
-A lightweight, reliable Chrome extension to capture pixel-perfect screenshots of any HTML element.
+<div align="center">
+    <img src="./assets/logo.png" alt="icon" width="150" />
+</div>
 
-![Element Snap Preview](./demo.png)
+<div align="center" style="margin-bottom: 2.5rem;">
+    <span style="font-size: 1.25rem;">
+      <b><strong style="font-size: 2.25rem;">Element Snap</strong></b>
+      <br>"A lightweight, reliable Chrome extension to capture pixel-perfect screenshots of any HTML element."
+    </span>
+</div>
+
+![Element Snap Preview](./assets/preview.png)
 
 ## Why Element Snap?
 
