@@ -5,8 +5,8 @@
 </div>
 
 <div align="center" style="margin-bottom: 2.5rem;">
-    <span style="font-size: 1.25rem;">
-      <b><strong style="font-size: 2.25rem;">Element Snap</strong></b>
+    <span style="font-size: 2.5rem;">
+      <b><strong style="font-size: 5rem;">Element Snap</strong></b>
       <br>"A lightweight, reliable Chrome extension to capture pixel-perfect screenshots of any HTML element."
     </span>
 </div>
