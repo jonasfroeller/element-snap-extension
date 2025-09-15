@@ -30,6 +30,7 @@ $RECYCLE.BIN/
 # End of https://www.toptal.com/developers/gitignore/api/windows
 
 # Project outputs
+dist
 element-snap.zip
 *.crx
 
